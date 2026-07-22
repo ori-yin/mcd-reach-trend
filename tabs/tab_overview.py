@@ -5,10 +5,24 @@ from streamlit import column_config as cc
 import pandas as pd
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
-from config import RED, GOLD, TEXT, TEXT_SUB, axis_mk, axis_rate, AXIS_TITLE_SIZE, add_ctr_mean_line, add_mean_line
+from config import RED, GOLD, GREEN, TEXT, TEXT_SUB, axis_mk, axis_rate, AXIS_TITLE_SIZE, add_ctr_mean_line, add_mean_line
 
-# 分渠道 DAU 配色（与品牌色拉开差距，避免与总 DAU 金色撞色）
-CHANNEL_COLORS = ["#1f77b4", "#2ca02c", "#9467bd", "#17becf", "#e377c2", "#8c564b", "#7f7f7f"]
+# 分渠道 DAU 配色：彩虹色按渠道总量降序分配（跳过黄色，白底对比太弱）
+# 红 → 橙 →（跳黄）→ 绿 → 蓝 → 靛 → 紫
+RAINBOW = [RED, "#F5821F", GREEN, "#1F77B4", "#3F51B5", "#7E57C2"]
+
+
+def _channel_color_map(chan_map):
+    """渠道名 -> 颜色。按总量降序分配彩虹色（红→橙→跳黄→绿→蓝→靛→紫）；企微固定金、小程序固定深橙（与金拉开）。"""
+    order = sorted(chan_map, key=lambda ch: float(chan_map[ch]["DAU"].sum()), reverse=True)
+    mapping = {ch: RAINBOW[i % len(RAINBOW)] for i, ch in enumerate(order)}
+    for ch in mapping:
+        s = str(ch)
+        if "企微" in s:
+            mapping[ch] = GOLD
+        elif "小程序" in s:
+            mapping[ch] = "#E8620E"  # 深橙，避免与金 #FFC72C 太近
+    return mapping
 
 
 def render(daily, daily_coupon=None, dau_daily=None):
@@ -109,29 +123,33 @@ def render(daily, daily_coupon=None, dau_daily=None):
     else:
         total = _total_dau_series()
         chan_map = _channel_dau_map()
-        # y 轴量级以"总 DAU + 各渠道峰值"为基准
+        # y 轴量级：堆积柱按"每日各渠道之和"取峰值，再与总 DAU 折线峰值取 max
         peak = float(total["DAU"].max()) if not total.empty else 0
-        for cdf in chan_map.values():
-            if not cdf.empty:
-                peak = max(peak, float(cdf["DAU"].max()))
+        if chan_map:
+            stacked = pd.concat([cdf.assign(渠道=ch) for ch, cdf in chan_map.items()])
+            stack_peak = stacked.groupby("日期")["DAU"].sum().max()
+            if pd.notna(stack_peak):
+                peak = max(peak, float(stack_peak))
         fig_dau = go.Figure()
-        # 先画各渠道（细线），后画总 DAU（粗线，置顶）
-        for i, (ch, cdf) in enumerate(chan_map.items()):
-            color = CHANNEL_COLORS[i % len(CHANNEL_COLORS)]
-            fig_dau.add_trace(go.Scatter(
+        # 各渠道 = 堆积柱状图（彩虹色按总量降序：push=红、企微=橙、小程序=绿…）
+        cmap = _channel_color_map(chan_map)
+        for ch, cdf in chan_map.items():
+            color = cmap[ch]
+            fig_dau.add_trace(go.Bar(
                 x=cdf["日期"], y=cdf["DAU"],
-                name=ch, mode="lines+markers",
-                line=dict(color=color, width=1.5), marker=dict(size=4, color=color),
+                name=ch, marker_color=color, opacity=0.9,
                 hovertemplate=f"<b>{ch}</b><br>DAU: %{{y:,.0f}}<extra></extra>",
             ))
+        # 总 DAU（去重口径）= 柔和中灰折线，置顶但不抢色
         if not total.empty:
             fig_dau.add_trace(go.Scatter(
                 x=total["日期"], y=total["DAU"],
                 name="总 DAU", mode="lines+markers",
-                line=dict(color=GOLD, width=2.8), marker=dict(size=6, color=GOLD),
+                line=dict(color="#8C8C8C", width=2.8), marker=dict(size=6, color="#8C8C8C"),
                 hovertemplate="总 DAU: %{y:,.0f}<extra></extra>",
             ))
         fig_dau.update_layout(
+            barmode="stack",
             paper_bgcolor='#FFFFFF', plot_bgcolor='#FFFFFF', font=dict(color=TEXT),
             margin=dict(l=0, r=0, t=10, b=0), height=320,
             xaxis=dict(showgrid=False, tickfont=dict(color=TEXT_SUB), tickformat="%Y%m%d"),
@@ -140,10 +158,10 @@ def render(daily, daily_coupon=None, dau_daily=None):
                         font=dict(size=11, color=TEXT)),
             hovermode="x unified",
         )
-        fig_dau.update_yaxes(title_text="<b>DAU</b>", title_font=dict(color=GOLD, size=AXIS_TITLE_SIZE), showgrid=False)
+        fig_dau.update_yaxes(title_text="<b>DAU</b>", title_font=dict(color=TEXT, size=AXIS_TITLE_SIZE), showgrid=False)
         # 总 DAU 算术均值虚线（基期日均）
         if not total.empty:
-            add_mean_line(fig_dau, total["DAU"], color=GOLD, label_prefix="均值 总 DAU", fmt="{:,.0f}")
+            add_mean_line(fig_dau, total["DAU"], color="#8C8C8C", label_prefix="均值 总 DAU", fmt="{:,.0f}")
         st.plotly_chart(fig_dau, use_container_width=True)
 
     # 双轴图
