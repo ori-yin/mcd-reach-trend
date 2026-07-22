@@ -2,9 +2,13 @@
 """Tab1: 趋势"""
 import streamlit as st
 from streamlit import column_config as cc
+import pandas as pd
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 from config import RED, GOLD, TEXT, TEXT_SUB, axis_mk, axis_rate, AXIS_TITLE_SIZE, add_ctr_mean_line, add_mean_line
+
+# 分渠道 DAU 配色（与品牌色拉开差距，避免与总 DAU 金色撞色）
+CHANNEL_COLORS = ["#1f77b4", "#2ca02c", "#9467bd", "#17becf", "#e377c2", "#8c564b", "#7f7f7f"]
 
 
 def render(daily, daily_coupon=None, dau_daily=None):
@@ -43,13 +47,33 @@ def render(daily, daily_coupon=None, dau_daily=None):
                 f"<div class=\"kpi-label\">{label}<br>{sub}</div>"
                 f'<div class="{cls}">{delta_str}</div></div>')
 
+    def _total_dau_series():
+        """总 DAU 日序列：优先取 渠道=ALL/all 行；无 ALL 时按日期 sum 各渠道兜底"""
+        if dau_daily is None or dau_daily.empty:
+            return pd.DataFrame(columns=["日期", "DAU"])
+        mask = dau_daily["渠道"].str.upper() == "ALL"
+        if mask.any():
+            return dau_daily[mask].sort_values("日期")[["日期", "DAU"]].reset_index(drop=True)
+        return dau_daily.groupby("日期", as_index=False)["DAU"].sum().sort_values("日期").reset_index(drop=True)
+
+    def _channel_dau_map():
+        """分渠道 DAU：dict[channel] -> DataFrame(日期,DAU)；不含 ALL；按最近活跃日倒序"""
+        if dau_daily is None or dau_daily.empty:
+            return {}
+        sub = dau_daily[dau_daily["渠道"].str.upper() != "ALL"]
+        if sub.empty:
+            return {}
+        order = sub.groupby("渠道")["日期"].max().sort_values(ascending=False).index.tolist()
+        return {ch: sub[sub["渠道"] == ch].sort_values("日期")[["日期", "DAU"]].reset_index(drop=True) for ch in order}
+
     def kpi_dau():
         """DAU KPI 卡片（latest + 环比昨日），与上方 kpi_delta 同款样式"""
-        if dau_daily is None or dau_daily.empty:
+        total = _total_dau_series()
+        if total.empty:
             return ""
-        cur_dau = dau_daily["DAU"].iloc[-1]
-        if len(dau_daily) > 1:
-            prev_dau = dau_daily["DAU"].iloc[-2]
+        cur_dau = total["DAU"].iloc[-1]
+        if len(total) > 1:
+            prev_dau = total["DAU"].iloc[-2]
             delta = cur_dau - prev_dau
             sign = "+" if delta > 0 else ""
             arrow = "▲" if delta > 0 else "▼"
@@ -78,28 +102,48 @@ def render(daily, daily_coupon=None, dau_daily=None):
         if dau_html:
             st.markdown(dau_html, unsafe_allow_html=True)
 
-    # DAU 趋势（XLSX 第二个 sheet；样式与下方日趋势对齐）
-    st.markdown('<div class="section-title">DAU \u8d8b\u52bf</div>', unsafe_allow_html=True)
+        # DAU 趋势（XLSX 第二个 sheet；样式与下方日趋势对齐）
+    st.markdown('<div class="section-title">DAU 趋势</div>', unsafe_allow_html=True)
     if dau_daily is None or dau_daily.empty:
-        st.caption("未检测到 DAU 数据（DAU 通常在 XLSX 第二个 sheet，第一列日期，第二列 DAU）")
+        st.caption("未检测到 DAU 数据（DAU 通常在 XLSX 第二个 sheet，含 日期/渠道/DAU 三列）")
     else:
+        total = _total_dau_series()
+        chan_map = _channel_dau_map()
+        # y 轴量级以"总 DAU + 各渠道峰值"为基准
+        peak = float(total["DAU"].max()) if not total.empty else 0
+        for cdf in chan_map.values():
+            if not cdf.empty:
+                peak = max(peak, float(cdf["DAU"].max()))
         fig_dau = go.Figure()
-        fig_dau.add_trace(go.Scatter(
-            x=dau_daily["日期"], y=dau_daily["DAU"],
-            name="DAU", mode="lines+markers",
-            line=dict(color=GOLD, width=2.5), marker=dict(size=6, color=GOLD),
-            hovertemplate="DAU: %{y:,.0f}<extra></extra>",
-        ))
+        # 先画各渠道（细线），后画总 DAU（粗线，置顶）
+        for i, (ch, cdf) in enumerate(chan_map.items()):
+            color = CHANNEL_COLORS[i % len(CHANNEL_COLORS)]
+            fig_dau.add_trace(go.Scatter(
+                x=cdf["日期"], y=cdf["DAU"],
+                name=ch, mode="lines+markers",
+                line=dict(color=color, width=1.5), marker=dict(size=4, color=color),
+                hovertemplate=f"<b>{ch}</b><br>DAU: %{{y:,.0f}}<extra></extra>",
+            ))
+        if not total.empty:
+            fig_dau.add_trace(go.Scatter(
+                x=total["日期"], y=total["DAU"],
+                name="总 DAU", mode="lines+markers",
+                line=dict(color=GOLD, width=2.8), marker=dict(size=6, color=GOLD),
+                hovertemplate="总 DAU: %{y:,.0f}<extra></extra>",
+            ))
         fig_dau.update_layout(
             paper_bgcolor='#FFFFFF', plot_bgcolor='#FFFFFF', font=dict(color=TEXT),
-            margin=dict(l=0, r=0, t=10, b=0), height=300,
+            margin=dict(l=0, r=0, t=10, b=0), height=320,
             xaxis=dict(showgrid=False, tickfont=dict(color=TEXT_SUB), tickformat="%Y%m%d"),
-            yaxis=axis_mk(dau_daily["DAU"]),
-            showlegend=False, hovermode="x unified",
+            yaxis=axis_mk(peak),
+            legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="left", x=0,
+                        font=dict(size=11, color=TEXT)),
+            hovermode="x unified",
         )
         fig_dau.update_yaxes(title_text="<b>DAU</b>", title_font=dict(color=GOLD, size=AXIS_TITLE_SIZE), showgrid=False)
-        # DAU 算术均值虚线（基期日均）
-        add_mean_line(fig_dau, dau_daily["DAU"], color=GOLD, label_prefix="\u5747\u503c DAU", fmt="{:,.0f}")
+        # 总 DAU 算术均值虚线（基期日均）
+        if not total.empty:
+            add_mean_line(fig_dau, total["DAU"], color=GOLD, label_prefix="均值 总 DAU", fmt="{:,.0f}")
         st.plotly_chart(fig_dau, use_container_width=True)
 
     # 双轴图

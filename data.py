@@ -65,9 +65,14 @@ def _convert_types(df):
 
 
 def read_dau_sheet(file_bytes):
-    """读取 XLSX 第二个 sheet（按天去重 DAU）。
-    期望两列：第一列日期，第二列 DAU。接受 bytes（调用方从 uploaded.read() 获得）。
-    sheet 不足 2 个或数据为空时返回空 DataFrame。
+    """读取 XLSX 第二个 sheet（按天去重 DAU，可选分渠道）。
+
+    支持两种格式（自动检测）：
+      - 新格式（≥3 列且第 2 列非空）：日期 / 渠道 / DAU；"ALL"/"all" 表示总 DAU
+      - 旧格式（2 列）：日期 / DAU；解析后渠道列填充为 "ALL"
+
+    返回列：日期、渠道、DAU。sheet 不足 2 个或数据为空时返回空 DataFrame。
+    接受 bytes（调用方从 uploaded.read() 获得）。
     """
     import openpyxl
     wb = openpyxl.load_workbook(BytesIO(file_bytes), read_only=True, data_only=True)
@@ -82,20 +87,21 @@ def read_dau_sheet(file_bytes):
     if len(rows) < 2:
         return pd.DataFrame()
 
-    # 按位置取：第一列=日期，第二列=DAU
-    data_rows = [r for r in rows[1:] if len(r) >= 2 and r[0] is not None and r[1] is not None]
-    if not data_rows:
+    # 解析：3 列含非空渠道 → 新格式；否则 2 列 → 旧格式（渠道置 ALL）
+    parsed = []
+    for r in rows[1:]:
+        if len(r) >= 3 and r[0] is not None and r[1] is not None and r[2] is not None:
+            parsed.append((r[0], str(r[1]).strip(), r[2]))
+        elif len(r) >= 2 and r[0] is not None and r[1] is not None:
+            parsed.append((r[0], "ALL", r[1]))
+    if not parsed:
         return pd.DataFrame()
 
-    dates = [r[0] for r in data_rows]
-    daus = [r[1] for r in data_rows]
-
-    df = pd.DataFrame({
-        "日期": pd.to_datetime(dates, errors="coerce"),
-        "DAU": pd.to_numeric(daus, errors="coerce"),
-    })
-    df = df.dropna(subset=["日期", "DAU"])
-    return df
+    df = pd.DataFrame(parsed, columns=["日期_raw", "渠道", "DAU_raw"])
+    df["日期"] = pd.to_datetime(df["日期_raw"], errors="coerce")
+    df["DAU"] = pd.to_numeric(df["DAU_raw"], errors="coerce")
+    df = df.dropna(subset=["日期", "DAU"])[["日期", "渠道", "DAU"]]
+    return df.reset_index(drop=True)
 
 
 def load_csv(uploaded_file):
