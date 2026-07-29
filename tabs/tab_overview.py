@@ -196,7 +196,7 @@ def render(daily, daily_coupon=None, dau_daily=None):
     st.markdown('<div class="section-title">\u6bcf\u65e5\u660e\u7ec6</div>', unsafe_allow_html=True)
     display = daily.copy()
     display["\u53d1\u9001\u65e5\u671f"] = display["\u53d1\u9001\u65e5\u671f"].dt.strftime("%Y%m%d")
-    for col in ["\u89e6\u8fbe\u6210\u529f", "\u70b9\u51fb\u4eba\u6b21", "\u8ba2\u5355Sales", "Plan\u6570\u91cf"]:
+    for col in ["\u89e6\u8fbe\u6210\u529f", "\u70b9\u51fb\u4eba\u6b21", "\u8ba2\u5355Sales", "Plan\u6570\u91cf", "Unit\u6570\u91cf"]:
         display[col] = display[col].map("{:,}".format)
     display["CTR"] = display["CTR"].map("{:.2f}%".format)
     col_cfg = {
@@ -205,6 +205,7 @@ def render(daily, daily_coupon=None, dau_daily=None):
         "\u70b9\u51fb\u4eba\u6b21": cc.TextColumn("\u70b9\u51fb\u4eba\u6b21", width="small"),
         "\u8ba2\u5355Sales": cc.TextColumn("\u8ba2\u5355Sales", width="small"),
         "Plan\u6570\u91cf": cc.TextColumn("Plan\u6570\u91cf", width="small"),
+        "Unit\u6570\u91cf": cc.TextColumn("Unit\u6570\u91cf", width="small"),
         "CTR": cc.TextColumn("CTR", width="small"),
     }
     st.dataframe(display, use_container_width=True, hide_index=True,

@@ -114,12 +114,17 @@ if df_current.empty:
     st.stop()
 
 # ─── 日汇总（基期，用于趋势图等） ───
-daily = df_base.groupby("发送日期").agg(
-    触达成功=("触达成功", "sum"),
-    点击人次=("点击人次", "sum"),
-    订单Sales=("订单Sales", "sum"),
-    Plan数量=("plan_id", "count"),
-).reset_index()
+agg_dict = {
+    "触达成功": ("触达成功", "sum"),
+    "点击人次": ("点击人次", "sum"),
+    "订单Sales": ("订单Sales", "sum"),
+    "Plan数量": ("plan_id", "nunique"),
+}
+if "unit_id" in df_base.columns:
+    agg_dict["Unit数量"] = ("unit_id", "nunique")
+daily = df_base.groupby("发送日期").agg(**agg_dict).reset_index()
+if "Unit数量" not in daily.columns:
+    daily["Unit数量"] = 0
 daily["CTR"] = compute_ctr(daily)
 
 # ─── 日汇总（按券维度，用于券分析图） ───
@@ -127,7 +132,7 @@ if "是否用券" in df_base.columns:
     daily_coupon = df_base.groupby(["发送日期", "是否用券"]).agg(
         触达成功=("触达成功", "sum"),
         点击人次=("点击人次", "sum"),
-        Plan数量=("plan_id", "count"),
+        Plan数量=("plan_id", "nunique"),
     ).reset_index()
     daily_coupon["CTR"] = compute_ctr(daily_coupon)
 else:

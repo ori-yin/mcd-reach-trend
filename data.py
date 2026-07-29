@@ -18,6 +18,10 @@ def _map_columns(df):
             col_map[c] = "渠道"
         elif "plan_id" in cl or "plan id" in cl:
             col_map[c] = "plan_id"
+        elif "unit_id" in cl or "unit id" in cl:
+            col_map[c] = "unit_id"
+        elif "message_id" in cl or "message id" in cl:
+            col_map[c] = "message_id"
         elif any(k in cl for k in ["plan名称", "plan_name", "plan 名称"]):
             col_map[c] = "plan名称"
         elif "owner" in cl:
@@ -105,7 +109,7 @@ def read_dau_sheet(file_bytes):
 
 
 def load_csv(uploaded_file):
-    """读取 CSV，仅保留 A-M 列（0-12），跳过 JSON 列"""
+    """读取 CSV，保留 A-Q 列（pandas 0-indexed 0~16，共 17 列）"""
     data = uploaded_file.read()
     encodings = ["utf-8", "utf-8-sig", "gbk", "gb2312", "latin1"]
     df = None
@@ -117,16 +121,16 @@ def load_csv(uploaded_file):
             continue
     if df is None:
         raise ValueError("无法解析 CSV 文件")
-    # 只保留前 13 列 (A-M)，跳过 JSON 列
-    if df.shape[1] >= 13:
-        df = df.iloc[:, :13]
+    # 只保留前 17 列 (A-Q)，包含消息标题/消息内容（如未来列数变动会自动取全部）
+    if df.shape[1] >= 17:
+        df = df.iloc[:, :17]
     df = _map_columns(df)
     df = _convert_types(df)
     return df
 
 
 def load_xlsx(uploaded_file):
-    """读取 XLSX，仅保留 A-M 列（0-12），跳过 JSON 列，完整保留 emoji"""
+    """读取 XLSX，保留 A-Q 列（pandas 0-indexed 0~16，共 17 列），完整保留 emoji"""
     import openpyxl
     wb = openpyxl.load_workbook(BytesIO(uploaded_file.read()), read_only=True, data_only=True)
     ws = wb.active
@@ -140,9 +144,9 @@ def load_xlsx(uploaded_file):
     data_rows = rows[1:]
 
     df = pd.DataFrame(data_rows, columns=headers)
-    # 只保留前 13 列 (A-M)，跳过 JSON 列
-    if df.shape[1] >= 13:
-        df = df.iloc[:, :13]
+    # 只保留前 17 列 (A-Q)，包含消息标题/消息内容（如下游列扩展可调到更大）
+    if df.shape[1] >= 17:
+        df = df.iloc[:, :17]
     df = _map_columns(df)
     df = _convert_types(df)
     return df

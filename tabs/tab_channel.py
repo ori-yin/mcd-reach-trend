@@ -18,7 +18,7 @@ def render(dff):
         触达成功=("触达成功", "sum"),
         点击人次=("点击人次", "sum"),
         订单Sales=("订单Sales", "sum"),
-        Plan数量=("plan_id", "count"),
+        Plan数量=("plan_id", "nunique"),
     ).reset_index()
     ch_data["CTR"] = compute_ctr(ch_data)
 
@@ -60,7 +60,7 @@ def render(dff):
         触达成功=("触达成功", "sum"),
         点击人次=("点击人次", "sum"),
         订单Sales=("订单Sales", "sum"),
-        Plan数量=("plan_id", "count"),
+        Plan数量=("plan_id", "nunique"),
     ).reset_index()
     ch_sum["CTR"] = compute_ctr(ch_sum)
     total_reach = ch_sum["触达成功"].sum()

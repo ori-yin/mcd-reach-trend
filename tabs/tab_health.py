@@ -40,7 +40,7 @@ def render(df_base, df_current):
         点击人次=("点击人次", "sum"),
         订单GC=("订单GC", "sum"),
         订单Sales=("订单Sales", "sum"),
-        Plan数量=("plan_id", "count"),
+        Plan数量=("plan_id", "nunique"),
     ).reset_index()
     all_daily["单Plan触达效率"] = (
         all_daily["触达成功"] / all_daily["Plan数量"].replace(0, np.nan)
