@@ -138,7 +138,7 @@ if "是否用券" in df_base.columns:
 else:
     daily_coupon = None
 
-# ─── DAU 日序列（跟随基期日期范围；不受渠道/计划/Owner/券筛子影响） ───
+# ─── DAU 日序列（跟随基期日期范围 + 渠道筛选；不受计划/Owner/券筛子影响） ───
 if not dau_raw.empty:
     dau_daily = dau_raw.copy()
     if isinstance(base_range, (list, tuple)) and len(base_range) == 2:
@@ -148,6 +148,8 @@ if not dau_raw.empty:
                 (dau_daily["日期"] >= pd.to_datetime(sd))
                 & (dau_daily["日期"] <= pd.to_datetime(ed))
             ]
+    if sel_channel != "全部" and "渠道" in dau_daily.columns:
+        dau_daily = dau_daily[dau_daily["渠道"] == sel_channel]
     dau_daily = dau_daily.sort_values("日期").reset_index(drop=True)
 else:
     dau_daily = dau_raw
@@ -159,7 +161,7 @@ tab1, tab2, tab3, tab4, tab5, tab6 = st.tabs(
     ["监控", "趋势", "渠道", "owner", "漏斗", "券"]
 )
 with tab1:
-    tab_health.render(df_base, df_current)
+    tab_health.render(df_base, df_current, dau_daily)
 with tab2:
     tab_overview.render(daily, daily_coupon, dau_daily)
 with tab3:

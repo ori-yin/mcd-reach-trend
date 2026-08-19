@@ -23,12 +23,13 @@ def _quantiles(s):
     return tuple(s.quantile(q) for q in (0.05, 0.25, 0.50, 0.75, 0.95))
 
 
-def render(df_base, df_current):
+def render(df_base, df_current, dau_daily):
     """渲染监控 Tab
-    
+
     Args:
         df_base: 基期数据（用于计算分位数和日均值）
         df_current: 现期数据（单日，用于展示当前值）
+        dau_daily: DAU 日序列（已按渠道筛选），用于 DAU 健康度模块
     """
 
     st.markdown('<div class="section-title">健康度总览</div>', unsafe_allow_html=True)
@@ -147,6 +148,60 @@ def render(df_base, df_current):
     st.markdown(row2, unsafe_allow_html=True)
 
 
+    # ═══════════════════════════════════════════════════════════════
+    # DAU 健康度模块（位于 CTR 分渠道之上，DAU 是上游流量大盘，先于 CTR 看更顺）
+    # ═══════════════════════════════════════════════════════════════
+    if not dau_daily.empty:
+        # ── DAU 健康度（分渠道；总卡删除：其数字=分渠道之和，冗余） ──
+        st.markdown('<div class="section-title">DAU 健康度</div>', unsafe_allow_html=True)
+        cur_date_ts = df_current["发送日期"].iloc[0] if not df_current.empty else None
+        ch_dau_daily = dau_daily.groupby(["日期", "渠道"])["DAU"].sum().reset_index()
+        ch_dau_thresholds = {}
+        for ch in ch_dau_daily["渠道"].unique():
+            sub = ch_dau_daily[ch_dau_daily["渠道"] == ch]
+            dau_series = sub["DAU"]
+            if len(dau_series) >= 3:
+                n_days_ch = sub["日期"].nunique()
+                mean_dau = float(sub["DAU"].sum() / n_days_ch) if n_days_ch > 0 else 0
+                ch_dau_thresholds[ch] = {
+                    "p5":   dau_series.quantile(0.05),
+                    "p25":  dau_series.quantile(0.25),
+                    "p50":  dau_series.quantile(0.50),
+                    "p75":  dau_series.quantile(0.75),
+                    "p95":  dau_series.quantile(0.95),
+                    "mean": round(mean_dau, 2),
+                }
+            else:
+                ch_dau_thresholds[ch] = {"p5": 0, "p25": 0, "p50": 0, "p75": 9e15, "p95": 9e15, "mean": 0}
+
+        cur_ch_dau = dau_daily[dau_daily["日期"] == cur_date_ts]
+        cur_ch_dau_agg = cur_ch_dau.groupby("渠道")["DAU"].sum().reset_index()
+        ch_dau_cards_html = []
+        for ch in sorted(ch_dau_daily["渠道"].unique()):
+            thr = ch_dau_thresholds[ch]
+            ch_row = cur_ch_dau_agg[cur_ch_dau_agg["渠道"] == ch]
+            if ch_row.empty:
+                continue
+            ch_dau_val = float(ch_row["DAU"].iloc[0])
+            ch_band = pct_band(ch_dau_val, thr["p5"], thr["p25"], thr["p75"], thr["p95"])
+            avg_txt = f'<div style="font-size:11px;color:{TEXT_SUB};margin-top:4px;opacity:0.7;">vs 基期日均 {_fmt_num(thr["mean"])}</div>'
+            card_html = kpi_card_with_bar(
+                ch, ch_band, _fmt_num(ch_dau_val), avg_txt,
+                ch_dau_val, thr["p5"], thr["p25"], thr["p50"], thr["p75"], thr["p95"]
+            )
+            ch_dau_cards_html.append(card_html)
+        # 每行最多 3 个渠道卡片，与 CTR 分渠道同款排版
+        for i in range(0, len(ch_dau_cards_html), 3):
+            row_cards = ch_dau_cards_html[i:i+3]
+            while len(row_cards) < 3:
+                row_cards.append('<div></div>')
+            st.markdown(
+                f'<div style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;margin-bottom:12px;align-items:stretch">'
+                + ''.join(row_cards)
+                + '</div>',
+                unsafe_allow_html=True,
+            )
+
     # ==================== 分渠道 CTR 分布条 ====================
     st.markdown('<div class="section-title">CTR 分渠道健康状态</div>', unsafe_allow_html=True)
     ch_cards_html = []
@@ -168,9 +223,9 @@ def render(df_base, df_current):
         row_cards = ch_cards_html[i:i+3]
         # 如果不足3个，补空div保持对齐
         while len(row_cards) < 3:
-            row_cards.append('<div style="flex:1;"></div>')
+            row_cards.append('<div></div>')
         row_html = (
-            f'<div style="display:flex;gap:12px;margin-bottom:12px;align-items:stretch">'
+            f'<div style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;margin-bottom:12px;align-items:stretch">'
             + ''.join(row_cards)
             + '</div>'
         )
