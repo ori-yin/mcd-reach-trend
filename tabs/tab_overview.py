@@ -180,7 +180,7 @@ def render(daily, daily_coupon=None, dau_daily=None):
         secondary_y=True)
     fig.update_layout(
         paper_bgcolor='#FFFFFF', plot_bgcolor='#FFFFFF', font=dict(color=TEXT),
-        legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
+        legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="left", x=0),
         margin=dict(l=0, r=0, t=10, b=0), height=300,
         xaxis=dict(showgrid=False, tickfont=dict(color=TEXT_SUB), tickformat="%Y%m%d"),
         yaxis=axis_mk(daily["\u89e6\u8fbe\u6210\u529f"]),

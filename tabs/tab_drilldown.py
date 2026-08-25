@@ -93,11 +93,15 @@ def render(dff):
                            line=dict(color=GOLD, width=2.5), marker=dict(size=5),
                            hovertemplate="CTR: %{y:.2f}%<extra></extra>"),
                 secondary_y=True)
+            fig.add_annotation(
+                text=f"<b>{ow}</b>", xref="paper", yref="paper",
+                x=0.5, y=1.12, xanchor="center", yanchor="bottom",
+                showarrow=False, font=dict(size=14, color=TEXT),
+            )
             fig.update_layout(
                 paper_bgcolor="#FFFFFF", plot_bgcolor="#FFFFFF", font=dict(color=TEXT),
-                title=dict(text=f"<b>{ow}</b>", font=dict(size=14, color=TEXT), x=0, y=0.98),
-                legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
-                margin=dict(l=0, r=0, t=35, b=0), height=220,
+                legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="left", x=0),
+                margin=dict(l=0, r=0, t=55, b=0), height=220,
                 xaxis=dict(showgrid=False, tickfont=dict(color=TEXT_SUB), tickformat="%Y%m%d"),
                 yaxis=axis_mk(sub["触达成功"]),
                 yaxis2=axis_rate(sub["CTR"]),

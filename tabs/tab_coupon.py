@@ -159,7 +159,7 @@ def render(daily_coupon):
         fig2.update_layout(
             barmode="stack",
             paper_bgcolor='#FFFFFF', plot_bgcolor='#FFFFFF', font=dict(color=TEXT),
-            legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
+            legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="left", x=0),
             margin=dict(l=0, r=0, t=10, b=0), height=300,
             xaxis=dict(showgrid=False, tickfont=dict(color=TEXT_SUB), tickformat="%Y%m%d"),
             yaxis=axis_mk(_reach_total if len(_reach_total) else pd.Series([0])),
@@ -246,7 +246,7 @@ def render(daily_coupon):
             fig3.update_layout(
                 barmode="stack",
                 paper_bgcolor='#FFFFFF', plot_bgcolor='#FFFFFF', font=dict(color=TEXT),
-                legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
+                legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="left", x=0),
                 margin=dict(l=0, r=0, t=10, b=0), height=280,
                 xaxis=dict(showgrid=False, tickfont=dict(color=TEXT_SUB), tickformat="%Y%m%d"),
                 yaxis=axis_mk(_plan_total if len(_plan_total) else pd.Series([0])),

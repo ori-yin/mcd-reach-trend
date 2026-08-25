@@ -132,3 +132,21 @@ streamlit run app.py
 | 背景 | #FFFFFF |
 | 圆角 | 14px |
 | 字体 | Inter + PingFang SC |
+
+---
+
+## 图表布局约定
+
+- **图例位置**：全部统一为左上角（`xanchor="left", x=0`，外层顶部 `y=1.02`）
+  - 原点：Plotly modebar（放大/缩小/重置）默认在右上角，会遮挡图例 hover 点击
+- **子图标题**（tab_channel / tab_drilldown）：使用 `fig.add_annotation` + `yref="paper"` 外移到顶部居中（`y=1.12`）
+  - 原因：Plotly `layout.title.y` 强制 [0,1] 区间，无法外移；用 annotation 解决
+  - `margin.t` 设为 55 同时容纳 annotation + legend 两层
+
+## 更新日志
+
+- **2026-08-25** — 图例布局统一：5 处右上→左上；`tab_channel.py` / `tab_drilldown.py` 子图标题改用 `add_annotation` 外移，避开与图例的视觉粘连。涉及 4 文件 17+/9- 行
+- **2026-08-19** — 监控 Tab 重构：DAU 健康度上提到 CTR 之上，渠道卡片改 grid 修复宽度不一致
+- **2026-07-29** — 趋势 / 渠道 Tab 双轴图 + 均值虚线
+- **2026-07-22** — 券维度 Tab + DAU 第二个 sheet 解析
+- **2026-07-06** — 初版上线
